@@ -213,6 +213,50 @@ curl -X POST http://localhost:8000/predict \
       }'
 ```
 
+### POST `/retrain`
+
+Endpoint para reentrenar el modelo y generar un nuevo archivo `.pkl`.
+
+**Método**: `POST`  
+**Ruta**: `/retrain`  
+**Autenticación**: requiere JWT en la cabecera `Authorization: Bearer <token>`.
+
+#### Headers
+
+| Key             | Value                       |
+| --------------- | --------------------------- |
+| `Authorization` | `Bearer <token>`            |
+| `Content-Type`  | `application/json` (no body)|
+
+#### Request
+
+Sin body. Invoca el reentrenamiento usando los datos en la base de datos y actualiza el modelo serializado.
+
+#### Response
+
+| Campo     | Tipo     | Descripción                                                                   |
+| --------- | -------- | ----------------------------------------------------------------------------- |
+| `status`  | `string` | `"success"` o `"error"`.                                                      |
+| `message` | `string` | Mensaje informando el resultado (por ejemplo, `"Model retrained"`).           |
+| `token`   | `string` | (Solo en éxito) Nuevo JWT generado al reentrenar, con la hora de reentrenado. |
+
+**Ejemplo de Request**:
+
+```bash
+curl -X POST http://localhost:8000/retrain \
+     -H "Authorization: Bearer <tu_token_valido>"
+```
+
+**Ejemplo de Response** (200 OK):
+
+```json
+{
+  "status": "success",
+  "message": "Model retrained",
+  "token": "eyJ0eXAiOiJKV1QiLCJh..."
+}
+```
+
 ---
 
 ## Ejemplos en Python
