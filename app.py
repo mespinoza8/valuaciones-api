@@ -200,6 +200,54 @@ def predict_endpoint():
 # --- Nuevo endpoint para reentrenar el modelo ---
 @app.route('/retrain', methods=['POST'])
 def retrain_endpoint():
+    """
+    Reentrena el modelo y actualiza el archivo serializado.
+    ---
+    tags:
+      - Valuaciones
+    parameters:
+      - in: header
+        name: Authorization
+        required: true
+        description: Token JWT en formato `Bearer <token>`
+        schema:
+          type: string
+    responses:
+      200:
+        description: Modelo reentrenado con éxito
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+              example: success
+            message:
+              type: string
+              example: Model retrained
+            token:
+              type: string
+              example: eyJ0eXAiOiJKV1QiLCJh...
+      401:
+        description: Falta o token inválido
+        schema:
+          type: object
+          properties:
+            error:
+              type: string
+              example: Missing or invalid Authorization header
+      500:
+        description: Error al reentrenar el modelo
+        schema:
+          type: object
+          properties:
+            status:
+              type: string
+              example: error
+            message:
+              type: string
+              example: Traceback (most recent call last)...
+    """
+
     # Autenticación
     auth = request.headers.get('Authorization', '')
     if not auth.startswith('Bearer '):
