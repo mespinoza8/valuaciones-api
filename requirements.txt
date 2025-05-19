@@ -19,3 +19,4 @@ requests==2.32.3
 gunicorn>=20.1
 pyarrow>=8.0
 flasgger>=0.9.5
+jwt>=1.0

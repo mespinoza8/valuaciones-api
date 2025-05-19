@@ -10,6 +10,7 @@ from sqlalchemy import create_engine, text
 from datetime import datetime
 from flasgger import Swagger
 import subprocess
+import jwt
 
 
 
@@ -17,6 +18,8 @@ load_dotenv()
 
 
 # Configuración
+
+SECRET_KEY = os.getenv('SECRET_KEY')
 MODEL_PATH = os.getenv('MODEL_PATH', 'modelo_valoracion.pkl')
 SHP_PATHS = {
     'ed_superior': os.getenv('ED_SUPERIOR_SHP', 'data_preprocessed/ed_superior.parquet').strip("'\""),
@@ -36,10 +39,8 @@ db_port = os.getenv('DB_PORT', '3306')
 db_name = os.getenv('DB_NAME', 'valuaciones')
 # Añadimos charset utf8mb4 para compatibilidad de caracteres
 DB_URI = (
-    f"mysql+pymysql://"
-    f"{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@"
-    f"{os.getenv('HOST')}:{os.getenv('PORT','3306')}/"
-    f"{os.getenv('DATABASE','ml_valoranet')}"
+    f"mysql+pymysql://{db_user}:{db_pass}"
+    f"@{db_host}:{db_port}/{db_name}"
 )
 engine = create_engine(DB_URI)
 
@@ -182,27 +183,29 @@ def predict_endpoint():
 # --- Nuevo endpoint para reentrenar el modelo ---
 @app.route('/retrain', methods=['POST'])
 def retrain_endpoint():
-    """
-    Re entrena el modelo corriendo el script train_model.py y actualizandolo en memoria.
-    ---
-    tags:
-      - Valuaciones
-    responses:
-      200:
-        description: Re entrenamiento exitoso
-      500:
-        description: Re entrenamiento fallido
-    """
+    # Autenticación
+    auth = request.headers.get('Authorization', '')
+    if not auth.startswith('Bearer '):
+        return jsonify(error='Missing or invalid Authorization header'), 401
+    token = auth.split(' ', 1)[1]
     try:
-        result = subprocess.run(['python3', 'train_model.py'], capture_output=True, text=True)
-        if result.returncode != 0:
-            return jsonify({'status': 'error', 'message': result.stderr}), 500
-        global model
-        model = joblib.load(MODEL_PATH)
-        return jsonify({'status': 'success', 'message': 'Model retrained'}), 200
-    except Exception as e:
-        app.logger.error(f"Error retraining model: {e}")
-        return jsonify({'error': str(e)}), 500
+        jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+    except jwt.InvalidTokenError:
+        return jsonify(error='Invalid token'), 401
+
+    # Lanzar entrenamiento (nota: esto bloqueará la petición)
+    proc = subprocess.run(['python3', 'train_model.py'], capture_output=True, text=True)
+    if proc.returncode != 0:
+        return jsonify(status='error', message=proc.stderr), 500
+
+    # Recargar modelo
+    global model
+    model = joblib.load(MODEL_PATH)
+
+    # Devolver token nuevo opcionalmente
+    new_token = jwt.encode({'retrained_at': datetime.now().isoformat()}, SECRET_KEY, algorithm='HS256')
+    return jsonify(status='success', message='Model retrained', token=new_token), 200
+
 
 if __name__ == '__main__':
     # Leer variables de entorno para Flask
