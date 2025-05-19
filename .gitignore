@@ -14,3 +14,7 @@ env/
 *.sln
 
 Thumbs.db
+
+__pycache__/
+
+modelo_valoracion.pkl
