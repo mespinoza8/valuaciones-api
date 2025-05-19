@@ -21,3 +21,5 @@ catboost_info/
 
 
 modelo_valoracion.pkl
+
+*.xlsx

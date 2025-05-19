@@ -184,7 +184,6 @@ Estimación del valor en UF.
 | `dormitorios`      | `integer` | Nº de dormitorios.                  |
 | `banos`            | `integer` | Nº de baños.                        |
 | `Comuna`           | `string`  | Nombre de comuna.                   |
-| `Region`           | `string`  | Nombre de región.                   |
 | `latitud`          | `number`  | Latitud decimal.                    |
 | `longitud`         | `number`  | Longitud decimal.                   |
 
@@ -207,7 +206,6 @@ curl -X POST http://localhost:8000/predict \
         "dormitorios":2,
         "banos":1,
         "Comuna":"Cerrillos",
-        "Region":"Región Metropolitana de Santiago",
         "latitud":-33.514,
         "longitud":-70.707
       }'
