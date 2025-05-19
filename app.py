@@ -9,6 +9,7 @@ import joblib
 from sqlalchemy import create_engine, text
 from datetime import datetime
 from flasgger import Swagger
+import subprocess
 
 
 
@@ -175,6 +176,33 @@ def predict_endpoint():
     except Exception as e:
         app.logger.error(f"Error in predict_endpoint: {e}")
         return jsonify({'error': str(e)}), 400
+    
+
+
+# --- Nuevo endpoint para reentrenar el modelo ---
+@app.route('/retrain', methods=['POST'])
+def retrain_endpoint():
+    """
+    Re entrena el modelo corriendo el script train_model.py y actualizandolo en memoria.
+    ---
+    tags:
+      - Valuaciones
+    responses:
+      200:
+        description: Re entrenamiento exitoso
+      500:
+        description: Re entrenamiento fallido
+    """
+    try:
+        result = subprocess.run(['python3', 'train_model.py'], capture_output=True, text=True)
+        if result.returncode != 0:
+            return jsonify({'status': 'error', 'message': result.stderr}), 500
+        global model
+        model = joblib.load(MODEL_PATH)
+        return jsonify({'status': 'success', 'message': 'Model retrained'}), 200
+    except Exception as e:
+        app.logger.error(f"Error retraining model: {e}")
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     # Leer variables de entorno para Flask
