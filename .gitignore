@@ -17,4 +17,7 @@ Thumbs.db
 
 __pycache__/
 
+catboost_info/
+
+
 modelo_valoracion.pkl
