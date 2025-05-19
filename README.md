@@ -200,7 +200,6 @@ Estimación del valor en UF.
 curl -X POST http://localhost:8000/predict \
   -H 'Content-Type: application/json' \
   -d '{
-        "divisa":"UF",
         "tipo":"departamento",
         "superficie_util":61,
         "superficie_total":64,
@@ -234,7 +233,6 @@ print(resp.json())
 ```sql
 CREATE TABLE IF NOT EXISTS predictions (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  divisa            VARCHAR(10),
   tipo              VARCHAR(50),
   superficie_util   DECIMAL(12,2),
   superficie_total  DECIMAL(12,2),
