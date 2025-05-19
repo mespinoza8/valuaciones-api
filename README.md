@@ -60,10 +60,10 @@ gunicorn
 
 ## Instalación
 
-1. Clona el repositorio:
+1. Clona el repositorio :
 
    ```bash
-   git clone https://github.com/tuusuario/valuaciones-api.git
+   git clone https://github.com/mespinoza8/valuaciones-api.git
    cd valuaciones-api
    ```
 2. Crea un entorno virtual e instálalo:
