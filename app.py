@@ -1,4 +1,3 @@
-# api.py
 import os
 from dotenv import load_dotenv
 import pandas as pd
@@ -11,6 +10,7 @@ from datetime import datetime
 from flasgger import Swagger
 import subprocess
 import jwt
+import json
 
 
 
@@ -161,7 +161,7 @@ def predict_endpoint():
       prediction = model.predict(df_new)[0]
 
 
-              # Guardar consulta y resultado en PostgreSQL
+              # Guardar consulta y resultado en BD
       record = {
           **features,
           'latitud': lat,
@@ -270,6 +270,37 @@ def retrain_endpoint():
     # Devolver token nuevo opcionalmente
     new_token = jwt.encode({'retrained_at': datetime.now().isoformat()}, SECRET_KEY, algorithm='HS256')
     return jsonify(status='success', message='Model retrained', token=new_token), 200
+
+@app.route('/metrics', methods=['GET'])
+def metrics_endpoint():
+    """
+    Devuelve las métricas del mejor modelo entrenado.
+    ---
+    tags:
+      - Valuaciones
+    responses:
+      200:
+        description: Métricas del modelo
+        schema:
+          type: object
+          properties:
+            model_name:
+              type: string
+            metrics:
+              type: object
+    """
+    try:
+        # Cargar métricas desde archivo JSON
+        with open('metrics.json', 'r') as f:
+            data = json.load(f)
+        return jsonify(data), 200
+    except FileNotFoundError:
+        return jsonify({'error': 'metrics.json no encontrado'}), 404
+    except Exception as e:
+        app.logger.error(f"Error en metrics_endpoint: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 
 
 if __name__ == '__main__':

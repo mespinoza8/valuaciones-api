@@ -1,4 +1,5 @@
 import joblib
+import json
 import os
 import pandas as pd
 import numpy as np
@@ -76,5 +77,17 @@ def entrenar_y_guardar_modelo(df: pd.DataFrame,
     # 4) Serializar
     joblib.dump(final_pipe, model_path)
     print(f"Modelo guardado en: {model_path}")
+
+    # Exportar resultados (métricas) a JSON
+    metrics_output = {
+        "model_name": best,
+        "metrics": results
+    }
+    # Guardar en el mismo directorio del modelo
+    metrics_path = os.path.join(os.path.dirname(model_path), "metrics.json")
+    with open(metrics_path, "w", encoding="utf-8") as mf:
+        json.dump(metrics_output, mf, indent=4, ensure_ascii=False)
+    print(f"Métricas guardadas en: {metrics_path}")
+
 
     return results, best

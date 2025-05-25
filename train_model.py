@@ -1,10 +1,11 @@
-# train_model.py
-
 import os
 import pandas as pd
 import geopandas as gpd
 from sqlalchemy import create_engine, text
 from dotenv import load_dotenv
+import requests
+
+
 
 # Carga variables de entorno desde .env
 load_dotenv()
@@ -37,15 +38,42 @@ SHP_PATHS = {
     'comunas':     os.environ['COMUNAS_SHP']
 }
 
+query = text("""
+    SELECT
+        id,
+        name,
+        URL,
+        divisa,
+        precio,
+        `desc`,
+        ubicacion,
+        source,
+        disponible,
+        fecha_creacion,
+        fecha_modificacion,
+        tipo,
+        comuna,
+        superficie_total,
+        superficie_util,
+        dormitorios,
+        banos,
+        estacionamientos,
+        antiguedad,
+        orientacion,
+        latitud,
+        longitud
+    FROM witness_scrapper
+""")
+
 # --- 2) Cargar datos brutos desde MySQL ---
 engine = create_engine(DB_URI)
 with engine.connect() as conn:
-    df = pd.read_sql(text("SELECT * FROM witness_scrapper"), con=conn)
+    df = pd.read_sql(sql=query, con=conn)
 
 # --- 3) Preprocessing idéntico al de tu API ---
 # 3.1 Convertir precios a UF (asegura que 'precio' sea float para evitar warnings)
 df['precio'] = df['precio'].astype(float)
-df = convertir_precio(df, valor_uf=39000)
+df = convertir_precio(df, valor_uf=39500)
 
 # 3.2 Limpiar columnas numéricas
 for col in ['superficie_util', 'superficie_total', 'antiguedad', 'banos', 'dormitorios']:
@@ -59,13 +87,13 @@ df['antiguedad'] = df['antiguedad'].apply(lambda x: 2025 - x if x >= 1000 else x
 
 # 3.4 Calcular distancias geoespaciales
 gp = geometry_points(df)
-ed_sup = gpd.read_file(SHP_PATHS['ed_superior'])
-ed_esc = gpd.read_file(SHP_PATHS['ed_escolar'])
-comi   = gpd.read_file(SHP_PATHS['comisarias'])
-salud  = gpd.read_file(SHP_PATHS['salud'])
-metro  = gpd.read_file(SHP_PATHS['metro'])
+ed_sup = gpd.read_parquet(SHP_PATHS['ed_superior'])
+ed_esc = gpd.read_parquet(SHP_PATHS['ed_escolar'])
+comi   = gpd.read_parquet(SHP_PATHS['comisarias'])
+salud  = gpd.read_parquet(SHP_PATHS['salud'])
+metro  = gpd.read_parquet(SHP_PATHS['metro'])
 
-comunas_gdf = gpd.read_file(SHP_PATHS['comunas'], engine="fiona")
+comunas_gdf = gpd.read_parquet(SHP_PATHS['comunas'])
 
 
 comunas_gdf = comunas_gdf.to_crs(gp.crs)
