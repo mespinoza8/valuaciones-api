@@ -44,8 +44,9 @@ def evaluar_modelo_cv(X: pd.DataFrame, y: pd.Series, preprocessor, cv: int=5):
         pipe = Pipeline([('preproc', preprocessor), ('model', model)])
         y_pred = cross_val_predict(pipe, X, y, cv=kf)
         mse = mean_squared_error(y, y_pred)
+        mape = np.mean(np.abs((y - y_pred) / y)) * 100
         r2 = r2_score(y, y_pred)
-        results[name] = {'rmse': np.sqrt(mse), 'r2': r2}
+        results[name] = {'rmse': np.sqrt(mse), 'r2': r2,'mape': mape}
 
     return results
 

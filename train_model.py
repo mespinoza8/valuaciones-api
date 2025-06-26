@@ -116,6 +116,10 @@ mask = (
     (df['precio']      > 0) & (df['precio']      < 25000)
 )
 
+df_metrics = df[mask].copy()
+
+df_metrics.to_parquet('/Users/mespinoza/Documents/Projects/Modelo Final - Valuaciones/data_preprocessed/df_metrics.parquet')
+
 df=df.drop(columns=['geometry','source','comuna','URL','disponible','fecha_creacion',
                     'fecha_modificacion','orientacion','id','name','desc','ubicacion','estacionamientos','index_right','antiguedad'],axis=1)
 

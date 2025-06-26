@@ -11,8 +11,7 @@ from flasgger import Swagger
 import subprocess
 import jwt
 import json
-
-
+from data_metrics import metricas_comuna
 
 load_dotenv()
 
@@ -160,13 +159,28 @@ def predict_endpoint():
       df_new = pd.DataFrame([features])
       prediction = model.predict(df_new)[0]
 
+      # Calcular métricas por comuna
+
+
+      metricas_comuna_df = metricas_comuna()
+      comuna_metrics = metricas_comuna_df.query("Comuna == @comuna")
+      avg_price_uf=comuna_metrics.query("Comuna == @comuna")['avg_price_uf'].values[0]
+      superficie_util_promedio=comuna_metrics.query("Comuna == @comuna")['superficie'].values[0]
+      nro_propiedades=comuna_metrics.query("Comuna == @comuna")['n_properties'].values[0]
+
+
+
 
               # Guardar consulta y resultado en BD
       record = {
           **features,
+          'antiguedad':10,
           'latitud': lat,
           'longitud': lon,
           'prediction_uf': float(prediction),
+          'avg_price_uf':    avg_price_uf,
+          'avg_price_uf_m2': superficie_util_promedio,
+          'n_properties':  nro_propiedades,
           'requested_at': datetime.now()
       }
       insert_sql = text("""
@@ -176,20 +190,23 @@ def predict_endpoint():
               comuna, region, latitud, longitud,
               distancia_ed_superior_km, distancia_ed_escolar_km,
               distancia_comisaria_km, distancia_est_salud_km, distancia_metro_km,
-              prediction_uf, requested_at
+              prediction_uf,avg_price_uf,avg_price_uf_m2, n_properties,requested_at
           ) VALUES (
               :divisa, :tipo, :superficie_util, :superficie_total,
               :antiguedad, :dormitorios, :banos,
               :Comuna, :Region, :latitud, :longitud,
               :distancia_ed_superior_km, :distancia_ed_escolar_km,
               :distancia_comisaria_km, :distancia_est_salud_km, :distancia_metro_km,
-              :prediction_uf, :requested_at
+              :prediction_uf, :avg_price_uf, :avg_price_uf_m2, :n_properties, :requested_at
           )
       """)
       with engine.begin() as conn:
           conn.execute(insert_sql, record)
 
-      return jsonify({'prediction_uf': float(prediction)})
+      return jsonify({'prediction_uf': float(prediction),
+                      'valor_promedio_propiedades_comuna':float(avg_price_uf),
+                      'superficie_util_promedio_comuna' :float(superficie_util_promedio),
+                      'cantidad_propiedades_comuna': int(nro_propiedades)})
 
     except Exception as e:
         app.logger.error(f"Error in predict_endpoint: {e}")
