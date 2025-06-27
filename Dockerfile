@@ -5,15 +5,24 @@ RUN apt-get update && apt-get install -y \
     gdal-bin libgdal-dev && \
     rm -rf /var/lib/apt/lists/*
 
+RUN useradd -m apiuser
+
 WORKDIR /app
+
 
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app.py model.py utils.py modelo_valoracion.pkl .env ./
-
+COPY app.py model.py utils.py data_metrics.py modelo_valoracion.pkl .env ./
 COPY data_preprocessed/ ./data_preprocessed/
+COPY metrics.json ./
+COPY Makefile ./
 
-EXPOSE 8000
+
+RUN chown -R apiuser:apiuser /app
+USER apiuser
+
+EXPOSE 8080
+HEALTHCHECK CMD curl -f http://localhost:8080/metrics || exit 1
 
 CMD ["gunicorn", "--bind", "0.0.0.0:8000", "app:app"]
