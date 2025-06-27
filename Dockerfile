@@ -25,4 +25,4 @@ USER apiuser
 EXPOSE 8080
 HEALTHCHECK CMD curl -f http://localhost:8080/metrics || exit 1
 
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "app:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "app:app"]
