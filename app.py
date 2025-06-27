@@ -323,6 +323,6 @@ def metrics_endpoint():
 if __name__ == '__main__':
     # Leer variables de entorno para Flask
     host = os.getenv('FLASK_HOST', '0.0.0.0')
-    port = int(os.getenv('FLASK_PORT', 8000))
+    port = int(os.getenv('FLASK_PORT', 8080))
     debug = os.getenv('FLASK_DEBUG', 'false').lower() == 'true'
     app.run(host=host, port=port, debug=debug)
