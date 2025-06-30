@@ -14,9 +14,7 @@ build:
 run:
 	@echo "Running Docker container: $(CONTAINER_NAME) on port $(PORT)"
 	@echo "Access the application at http://localhost:$(PORT)"
-	docker run -d --name $(CONTAINER_NAME) -p $(PORT):$(PORT) \
-		-v "$(PWD):/app" \
-		$(IMAGE_NAME)
++	docker run -d --name $(CONTAINER_NAME) -p $(PORT):8080 $(IMAGE_NAME)
 	# Opcional: Ver logs después de iniciar (puedes comentarlo si no lo necesitas inmediatamente)
 	# docker logs -f $(CONTAINER_NAME)
 
