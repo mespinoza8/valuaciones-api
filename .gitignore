@@ -21,6 +21,6 @@ catboost_info/
 model_version/
 metrics.json
 
-modelo_valoracion.pkl
+*.pkl
 
 *.xlsx

@@ -14,9 +14,11 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app.py model.py utils.py data_metrics.py modelo_valoracion.pkl .env ./
+COPY comunas.xlsx ./
 COPY data_preprocessed/ ./data_preprocessed/
 COPY metrics.json ./
 COPY Makefile ./
+
 
 
 RUN chown -R apiuser:apiuser /app
