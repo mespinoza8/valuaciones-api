@@ -2,7 +2,7 @@
 IMAGE_NAME := valuaciones-api
 CONTAINER_NAME := valuaciones-api-container
 PORT := 8080
-CONTAINER_PORT   := 8000
+CONTAINER_PORT   := 8080
 
 
 .PHONY: all build run stop clean rebuild
