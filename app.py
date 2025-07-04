@@ -15,6 +15,18 @@ from data_metrics import metricas_comuna
 
 load_dotenv()
 
+# Utility: Get comuna from coordinates using spatial join
+def get_comuna_from_coords(lat, lon, comunas_gdf):
+    punto = gpd.GeoDataFrame(
+        geometry=gpd.points_from_xy([lon], [lat]),
+        crs=comunas_gdf.crs
+    )
+    join = gpd.sjoin(punto, comunas_gdf, how='left', predicate='within')
+    if join.empty or pd.isnull(join.iloc[0]['Comuna']):
+        raise ValueError("Coordenadas fuera de los límites de las comunas conocidas.")
+    return join.iloc[0]['Comuna']
+
+
 
 # Configuración
 
@@ -61,6 +73,7 @@ ed_esc = gpd.read_parquet(SHP_PATHS['ed_escolar'])
 comi   = gpd.read_parquet(SHP_PATHS['comisarias'])
 salud  = gpd.read_parquet(SHP_PATHS['salud'])
 metro  = gpd.read_parquet(SHP_PATHS['metro'])
+comuna_file= gpd.read_parquet(SHP_PATHS['comunas']).to_crs(epsg=4326)
 
 # Inicializar Flask
 app = Flask(__name__)
@@ -76,73 +89,25 @@ swagger = Swagger(app, template={
 #http://localhost:8000/apidocs/
 @app.route('/predict', methods=['POST'])
 def predict_endpoint():
-    """
-    Estima el valor de una propiedad en UF.
-    ---
-    tags:
-      - Valuaciones
-    parameters:
-      - in: body
-        name: body
-        required: true
-        schema:
-          type: object
-          properties:
-            tipo:
-              type: string
-              example: departamento
-            superficie_util:
-              type: number
-              example: 61
-            superficie_total:
-              type: number
-              example: 64
-            antiguedad:
-              type: number
-              example: 30
-            dormitorios:
-              type: integer
-              example: 2
-            banos:
-              type: integer
-              example: 1
-            Comuna:
-              type: string
-              example: Cerrillos
-            latitud:
-              type: number
-              example: -33.514
-            longitud:
-              type: number
-              example: -70.707
-    responses:
-      200:
-        description: Valor estimado en UF
-        schema:
-          type: object
-          properties:
-            prediction_uf:
-              type: number
-              example: 4523.17
-      400:
-        description: JSON malformado o error de solicitud
-    """
-
-
-
+ 
     try:
       data = request.get_json(force=True)
-      comuna = data.get('Comuna')
-      if not comuna:
-          return jsonify({'error': "Debes enviar la 'Comuna'"}), 400
+      lat = data.get('latitud')
+      lon = data.get('longitud')
+      if lat is None or lon is None:
+          return jsonify({'error': "Debes enviar las coordenadas 'latitud' y 'longitud'"}), 400
+      
+      try:
+          comuna = get_comuna_from_coords(lat, lon, comuna_file)
+      except ValueError as ve:
+          return jsonify({'error': str(ve)}), 400
 
-      # Autocompletar región
       region = COMUNA_REGION_MAP.get(comuna)
       if not region:
           return jsonify({'error': f"Comuna '{comuna}' no está permitida"}), 400
 
       # Armar el payload con región añadida
-      features = {**data, 'Region': region, 'divisa': 'UF'}
+      features = {**data, 'Comuna': comuna, 'Region': region, 'divisa': 'UF'}
 
       lat = features['latitud']
       lon = features['longitud']
@@ -181,6 +146,7 @@ def predict_endpoint():
           'avg_price_uf':    avg_price_uf,
           'avg_price_uf_m2': superficie_util_promedio,
           'n_properties':  nro_propiedades,
+          'nombre_comuna': comuna,
           'requested_at': datetime.now()
       }
       insert_sql = text("""
@@ -190,20 +156,21 @@ def predict_endpoint():
               comuna, region, latitud, longitud,
               distancia_ed_superior_km, distancia_ed_escolar_km,
               distancia_comisaria_km, distancia_est_salud_km, distancia_metro_km,
-              prediction_uf,avg_price_uf,avg_price_uf_m2, n_properties,requested_at
+              prediction_uf,avg_price_uf,avg_price_uf_m2, n_properties, nombre_comuna, requested_at
           ) VALUES (
               :divisa, :tipo, :superficie_util, :superficie_total,
               :antiguedad, :dormitorios, :banos,
               :Comuna, :Region, :latitud, :longitud,
               :distancia_ed_superior_km, :distancia_ed_escolar_km,
               :distancia_comisaria_km, :distancia_est_salud_km, :distancia_metro_km,
-              :prediction_uf, :avg_price_uf, :avg_price_uf_m2, :n_properties, :requested_at
+              :prediction_uf, :avg_price_uf, :avg_price_uf_m2, :n_properties, :nombre_comuna, :requested_at
           )
       """)
       with engine.begin() as conn:
           conn.execute(insert_sql, record)
 
       return jsonify({'prediction_uf': float(prediction),
+                      'comuna': comuna,
                       'valor_promedio_propiedades_comuna':float(avg_price_uf),
                       'superficie_util_promedio_comuna' :float(superficie_util_promedio),
                       'cantidad_propiedades_comuna': int(nro_propiedades)})
