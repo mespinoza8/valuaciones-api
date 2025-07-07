@@ -6,6 +6,7 @@ from flask import Flask, request, jsonify
 from utils import create_point_gdf, calculate_nearest_distances, calculate_nearest_distances_metro
 import joblib
 from sqlalchemy import create_engine, text
+from sqlalchemy.pool import NullPool
 from datetime import datetime
 from flasgger import Swagger
 import subprocess
@@ -60,8 +61,10 @@ DB_URI = (
     f"mysql+pymysql://{db_user}:{db_pass}"
     f"@{db_host}:{db_port}/{db_name}"
 )
-engine = create_engine(DB_URI)
-
+engine = create_engine(
+    DB_URI,
+    poolclass=NullPool,
+    connect_args={"connect_timeout": 10})
 
 
 # Cargar el modelo serializado
