@@ -12,6 +12,8 @@ from flasgger import Swagger
 import subprocess
 import jwt
 import json
+import unicodedata
+
 from data_metrics import metricas_comuna
 
 load_dotenv()
@@ -27,6 +29,11 @@ def get_comuna_from_coords(lat, lon, comunas_gdf):
         raise ValueError("Coordenadas fuera de los límites de las comunas conocidas.")
     return join.iloc[0]['Comuna']
 
+
+def normalize_str(s: str) -> str:
+    nfkd = unicodedata.normalize('NFD', s)
+    only_base = ''.join(ch for ch in nfkd if unicodedata.category(ch) != 'Mn')
+    return only_base.lower().strip()
 
 
 # Configuración
@@ -46,9 +53,12 @@ SHP_PATHS = {
 MAPPING_FILE = os.getenv('COMUNA_REGION_FILE', 'comunas.xlsx')
 map_df = pd.read_excel(MAPPING_FILE)
 map_df.columns = map_df.columns.str.strip()
-COMUNA_REGION_MAP = dict(zip(map_df['Comuna'], map_df['Region']))
+raw_map = dict(zip(map_df['Comuna'], map_df['Region']))
 
-
+COMUNA_REGION_MAP = {
+    normalize_str(comuna_name): region
+    for comuna_name, region in raw_map.items()
+}
 
 # --- Configuración de la Base de Datos MariaDB ---
 db_user = os.getenv('DB_USER')
@@ -78,6 +88,8 @@ salud  = gpd.read_parquet(SHP_PATHS['salud'])
 metro  = gpd.read_parquet(SHP_PATHS['metro'])
 comuna_file= gpd.read_parquet(SHP_PATHS['comunas']).to_crs(epsg=4326)
 
+
+
 # Inicializar Flask
 app = Flask(__name__)
 swagger = Swagger(app, template={
@@ -98,12 +110,12 @@ def predict_endpoint():
         if lat is None or lon is None:
             return jsonify({'error': "Debes enviar las coordenadas 'latitud' y 'longitud'"}), 400
 
-        comuna = data.get('Comuna') or data.get('comuna')
-        if comuna:
-            comuna = comuna.strip()
+        raw = data.get('Comuna') or data.get('comuna')
+        if raw:
+            comuna = raw.strip().lower()
         else:
             try:
-                comuna = get_comuna_from_coords(lat, lon, comuna_file)
+                comuna = get_comuna_from_coords(lat, lon, comuna_file).strip().lower()
             except ValueError as ve:
                 return jsonify({'error': str(ve)}), 400
 
