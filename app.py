@@ -112,10 +112,11 @@ def predict_endpoint():
 
         raw = data.get('Comuna') or data.get('comuna')
         if raw:
-            comuna = raw.strip().lower()
+            comuna = normalize_str(raw)
         else:
             try:
-                comuna = get_comuna_from_coords(lat, lon, comuna_file).strip().lower()
+                fallback = get_comuna_from_coords(lat, lon, comuna_file).strip().lower()
+                comuna = normalize_str(fallback)
             except ValueError as ve:
                 return jsonify({'error': str(ve)}), 400
 
