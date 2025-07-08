@@ -88,103 +88,106 @@ swagger = Swagger(app, template={
         "version": "1.0.0"
     }
 })
-# Documentación de la API
-#http://localhost:8000/apidocs/
+
 @app.route('/predict', methods=['POST'])
 def predict_endpoint():
- 
     try:
-      data = request.get_json(force=True)
-      lat = data.get('latitud')
-      lon = data.get('longitud')
-      if lat is None or lon is None:
-          return jsonify({'error': "Debes enviar las coordenadas 'latitud' y 'longitud'"}), 400
+        data = request.get_json(force=True)
+        lat = data.get('latitud')
+        lon = data.get('longitud')
+        if lat is None or lon is None:
+            return jsonify({'error': "Debes enviar las coordenadas 'latitud' y 'longitud'"}), 400
+
+        comuna = data.get('Comuna') or data.get('comuna')
+        if comuna:
+            comuna = comuna.strip()
+        else:
+            try:
+                comuna = get_comuna_from_coords(lat, lon, comuna_file)
+            except ValueError as ve:
+                return jsonify({'error': str(ve)}), 400
+
+        # 3) Validar región
+        region = COMUNA_REGION_MAP.get(comuna)
+        if not region:
+            return jsonify({'error': f"Comuna '{comuna}' no está permitida"}), 400
+
+        # 4) Armar payload unificado
+        features = {**data, 'Comuna': comuna, 'Region': region, 'divisa': 'UF'}
+
+        # 5) Calcular distancias
+        punto = create_point_gdf(lat, lon)
+        features['distancia_ed_superior_km'] = calculate_nearest_distances(punto, ed_sup)[0]
+        features['distancia_ed_escolar_km']  = calculate_nearest_distances(punto, ed_esc)[0]
+        features['distancia_comisaria_km']   = calculate_nearest_distances(punto, comi)[0]
+        features['distancia_est_salud_km']   = calculate_nearest_distances(punto, salud)[0]
+        features['distancia_metro_km']       = calculate_nearest_distances_metro(punto, metro)[0]
+
+        # 6) Predecir
+        df_new = pd.DataFrame([features])
+        prediction = model.predict(df_new)[0]
+
+        # 7) Métricas por comuna
+        metricas_comuna_df = metricas_comuna()
+        cm    = metricas_comuna_df.query("Comuna == @comuna")
       
-      try:
-          comuna = get_comuna_from_coords(lat, lon, comuna_file)
-      except ValueError as ve:
-          return jsonify({'error': str(ve)}), 400
+        if cm.empty:
+            avg_price_uf          = 0.0
+            superficie_util_prom  = 0.0
+            nro_propiedades       = 0
+        else:
+          comuna_metrics    = metricas_comuna_df.query("Comuna == @comuna").iloc[0]
+          avg_price_uf            = comuna_metrics['avg_price_uf']
+          superficie_util_prom    = comuna_metrics['superficie']
+          nro_propiedades         = comuna_metrics['n_properties']
 
-      region = COMUNA_REGION_MAP.get(comuna)
-      if not region:
-          return jsonify({'error': f"Comuna '{comuna}' no está permitida"}), 400
+        # 8) Guardar en BD
+        record = {
+            **features,
+            'antiguedad': 0,
+            'prediction_uf':       float(prediction),
+            'avg_price_uf':        float(avg_price_uf),
+            'avg_price_uf_m2':     float(superficie_util_prom),
+            'n_properties':        int(nro_propiedades),
+            'requested_at':        datetime.now()
+        }
+        insert_sql = text("""
+            INSERT INTO model_predictions (
+                divisa, tipo, superficie_util, superficie_total,
+                antiguedad, dormitorios, banos,
+                comuna, region, latitud, longitud,
+                distancia_ed_superior_km, distancia_ed_escolar_km,
+                distancia_comisaria_km, distancia_est_salud_km,
+                distancia_metro_km, prediction_uf,
+                avg_price_uf, avg_price_uf_m2, n_properties, requested_at
+            ) VALUES (
+                :divisa, :tipo, :superficie_util, :superficie_total,
+                :antiguedad, :dormitorios, :banos,
+                :Comuna, :Region, :latitud, :longitud,
+                :distancia_ed_superior_km, :distancia_ed_escolar_km,
+                :distancia_comisaria_km, :distancia_est_salud_km,
+                :distancia_metro_km, :prediction_uf,
+                :avg_price_uf, :avg_price_uf_m2, :n_properties, :requested_at
+            )
+        """)
+        with engine.begin() as conn:
+            conn.execute(insert_sql, record)
 
-      # Armar el payload con región añadida
-      features = {**data, 'Comuna': comuna, 'Region': region, 'divisa': 'UF'}
-
-      lat = features['latitud']
-      lon = features['longitud']
-      punto = create_point_gdf(lat, lon)
-
-        # Calcular distancias
-      features['distancia_ed_superior_km'] = calculate_nearest_distances(punto, ed_sup)[0]
-      features['distancia_ed_escolar_km']  = calculate_nearest_distances(punto, ed_esc)[0]
-      features['distancia_comisaria_km']   = calculate_nearest_distances(punto, comi)[0]
-      features['distancia_est_salud_km']   = calculate_nearest_distances(punto, salud)[0]
-      features['distancia_metro_km']       = calculate_nearest_distances_metro(punto, metro)[0]
-
-      # Crear DataFrame y predecir
-      df_new = pd.DataFrame([features])
-      prediction = model.predict(df_new)[0]
-
-      # Calcular métricas por comuna
-
-
-      metricas_comuna_df = metricas_comuna()
-      comuna_metrics = metricas_comuna_df.query("Comuna == @comuna")
-      avg_price_uf=comuna_metrics.query("Comuna == @comuna")['avg_price_uf'].values[0]
-      superficie_util_promedio=comuna_metrics.query("Comuna == @comuna")['superficie'].values[0]
-      nro_propiedades=comuna_metrics.query("Comuna == @comuna")['n_properties'].values[0]
-
-
-
-
-              # Guardar consulta y resultado en BD
-      record = {
-          **features,
-          'antiguedad':10,
-          'latitud': lat,
-          'longitud': lon,
-          'prediction_uf': float(prediction),
-          'avg_price_uf':    avg_price_uf,
-          'avg_price_uf_m2': superficie_util_promedio,
-          'n_properties':  nro_propiedades,
-          'nombre_comuna': comuna,
-          'requested_at': datetime.now()
-      }
-      insert_sql = text("""
-          INSERT INTO model_predictions (
-              divisa, tipo, superficie_util, superficie_total,
-              antiguedad, dormitorios, banos,
-              comuna, region, latitud, longitud,
-              distancia_ed_superior_km, distancia_ed_escolar_km,
-              distancia_comisaria_km, distancia_est_salud_km, distancia_metro_km,
-              prediction_uf,avg_price_uf,avg_price_uf_m2, n_properties, nombre_comuna, requested_at
-          ) VALUES (
-              :divisa, :tipo, :superficie_util, :superficie_total,
-              :antiguedad, :dormitorios, :banos,
-              :Comuna, :Region, :latitud, :longitud,
-              :distancia_ed_superior_km, :distancia_ed_escolar_km,
-              :distancia_comisaria_km, :distancia_est_salud_km, :distancia_metro_km,
-              :prediction_uf, :avg_price_uf, :avg_price_uf_m2, :n_properties, :nombre_comuna, :requested_at
-          )
-      """)
-      with engine.begin() as conn:
-          conn.execute(insert_sql, record)
-
-      return jsonify({'prediction_uf': float(prediction),
-                      'comuna': comuna,
-                      'valor_promedio_propiedades_comuna':float(avg_price_uf),
-                      'superficie_util_promedio_comuna' :float(superficie_util_promedio),
-                      'cantidad_propiedades_comuna': int(nro_propiedades)})
+        # 9) Respuesta JSON
+        return jsonify({
+            'prediction_uf':                    float(prediction),
+            'comuna':                           comuna,
+            'valor_promedio_propiedades_comuna': float(avg_price_uf),
+            'superficie_util_promedio_comuna':   float(superficie_util_prom),
+            'cantidad_propiedades_comuna':       int(nro_propiedades)
+        }), 200
 
     except Exception as e:
         app.logger.error(f"Error in predict_endpoint: {e}")
         return jsonify({'error': str(e)}), 400
-    
+        
 
 
-# --- Nuevo endpoint para reentrenar el modelo ---
 @app.route('/retrain', methods=['POST'])
 def retrain_endpoint():
     """
