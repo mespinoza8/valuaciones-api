@@ -15,7 +15,7 @@ COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app.py model.py utils.py data_metrics.py modelo_valoracion.pkl .env ./
-COPY comunas.xlsx ./
+COPY comunas.xlsx resultados_qa.xlsx ./
 COPY data_preprocessed/ ./data_preprocessed/
 COPY metrics.json ./
 COPY Makefile ./
@@ -28,4 +28,4 @@ USER apiuser
 EXPOSE 8080
 HEALTHCHECK CMD curl -f http://localhost:8080/metrics || exit 1
 
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "app:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "app:app"] 

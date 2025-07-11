@@ -70,10 +70,17 @@ engine = create_engine(DB_URI)
 with engine.connect() as conn:
     df = pd.read_sql(sql=query, con=conn)
 
+# --- 2.1) Cargar datos validados desde la API
+resultados_api=pd.read_excel('/Users/mespinoza/Desktop/valuaciones-api/resultados_qa.xlsx')
+resultados_api = resultados_api.fillna('')
+
+df=pd.concat([df, resultados_api], ignore_index=True)
+
+
 # --- 3) Preprocessing idéntico al de tu API ---
 # 3.1 Convertir precios a UF (asegura que 'precio' sea float para evitar warnings)
 df['precio'] = df['precio'].astype(float)
-df = convertir_precio(df, valor_uf=39500)
+df = convertir_precio(df, valor_uf=39300)
 
 # 3.2 Limpiar columnas numéricas
 for col in ['superficie_util', 'superficie_total', 'antiguedad', 'banos', 'dormitorios']:

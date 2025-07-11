@@ -142,14 +142,15 @@ def predict_endpoint():
 
         # 7) Métricas por comuna
         metricas_comuna_df = metricas_comuna()
-        cm    = metricas_comuna_df.query("Comuna == @comuna")
-      
+        metricas_comuna_df['comuna_norm'] = metricas_comuna_df['Comuna'].apply(normalize_str)
+        cm = metricas_comuna_df[metricas_comuna_df['comuna_norm'] == comuna]
+
         if cm.empty:
             avg_price_uf          = 0.0
             superficie_util_prom  = 0.0
             nro_propiedades       = 0
         else:
-          comuna_metrics    = metricas_comuna_df.query("Comuna == @comuna").iloc[0]
+          comuna_metrics       = cm.iloc[0]
           avg_price_uf            = comuna_metrics['avg_price_uf']
           superficie_util_prom    = comuna_metrics['superficie']
           nro_propiedades         = comuna_metrics['n_properties']
@@ -203,53 +204,6 @@ def predict_endpoint():
 
 @app.route('/retrain', methods=['POST'])
 def retrain_endpoint():
-    """
-    Reentrena el modelo y actualiza el archivo serializado.
-    ---
-    tags:
-      - Valuaciones
-    parameters:
-      - in: header
-        name: Authorization
-        required: true
-        description: Token JWT en formato `Bearer <token>`
-        schema:
-          type: string
-    responses:
-      200:
-        description: Modelo reentrenado con éxito
-        schema:
-          type: object
-          properties:
-            status:
-              type: string
-              example: success
-            message:
-              type: string
-              example: Model retrained
-            token:
-              type: string
-              example: eyJ0eXAiOiJKV1QiLCJh...
-      401:
-        description: Falta o token inválido
-        schema:
-          type: object
-          properties:
-            error:
-              type: string
-              example: Missing or invalid Authorization header
-      500:
-        description: Error al reentrenar el modelo
-        schema:
-          type: object
-          properties:
-            status:
-              type: string
-              example: error
-            message:
-              type: string
-              example: Traceback (most recent call last)...
-    """
 
     # Autenticación
     auth = request.headers.get('Authorization', '')

@@ -13,7 +13,7 @@ def convertir_precio(df: pd.DataFrame, valor_uf: float) -> pd.DataFrame:
     df.loc[mask_pesos, 'precio'] = df.loc[mask_pesos, 'precio'] / valor_uf
     mask_usd = df['divisa'] == 'US$'
     if mask_usd.sum() > 0:
-        tasa_usd_clp = 930
+        tasa_usd_clp = 958
         df.loc[mask_usd, 'precio'] = (df.loc[mask_usd, 'precio'] * tasa_usd_clp) / valor_uf
     return df
 
