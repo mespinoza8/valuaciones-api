@@ -13,7 +13,7 @@ import subprocess
 import jwt
 import json
 import unicodedata
-
+import numpy as np 
 from data_metrics import metricas_comuna
 
 load_dotenv()
@@ -256,6 +256,206 @@ def metrics_endpoint():
     except Exception as e:
         app.logger.error(f"Error en metrics_endpoint: {e}")
         return jsonify({'error': str(e)}), 500
+
+
+################################################################################################################
+################################################################################################################
+########################Encargos################################################################################
+
+def cargar_modelo_v2():
+    try:
+        modelo = joblib.load('encargos_data/modelo_valuacion_propiedades_v2.pkl')
+        scaler = joblib.load('encargos_data/scaler_valuacion_propiedades_v2.pkl')
+        label_encoders = joblib.load('encargos_data/label_encoders_valuacion_propiedades_v2.pkl')
+        available_features = joblib.load('encargos_data/features_valuacion_propiedades_v2.pkl')
+        kmeans_model = joblib.load('encargos_data/kmeans_zona_geografica_v2.pkl')
+        densidad_por_zona = joblib.load('encargos_data/densidad_por_zona_v2.pkl')
+        
+        return modelo, scaler, label_encoders, available_features, kmeans_model, densidad_por_zona
+    except Exception as e:
+        app.logger.error(f"Error cargando modelo v2: {e}")
+        return None, None, None, None, None, None
+
+def preparar_datos_entrada_v2(datos_entrada, label_encoders, available_features, kmeans_model, densidad_por_zona):
+    """Prepara los datos de entrada para el modelo v2"""
+    df = pd.DataFrame([datos_entrada])
+
+    # Mapear latitud/longitud a latitud_corregida/longitud_corregida
+    df['latitud_corregida'] = df['latitud']
+    df['longitud_corregida'] = df['longitud']
+
+    # Calcular densidad de construcción
+    df['densidad_construccion'] = df['sup_edificada'] / df['sup_terreno'].replace(0, np.nan)
+    df['densidad_construccion'] = df['densidad_construccion'].fillna(1)
+    
+    # Calcular antigüedad
+    df['antiguedad'] = datetime.now().year - df['ano_construccion']
+    
+    # Crear bins de antigüedad
+    df['antiguedad_bin'] = pd.cut(df['antiguedad'], 
+                                  bins=[0, 10, 20, 30, 50, 100], 
+                                  labels=['0-10', '11-20', '21-30', '31-50', '50+'])
+    
+    # Crear bins de superficie edificada
+    df['sup_edificada_bin'] = pd.cut(df['sup_edificada'], 
+                                     bins=[0, 50, 80, 120, 200, 1000], 
+                                     labels=['0-50', '51-80', '81-120', '121-200', '200+'])
+    
+    # Clustering usando el modelo entrenado
+    if kmeans_model is not None:
+        coords = df[['latitud_corregida', 'longitud_corregida']].values
+        df['zona_geografica'] = kmeans_model.predict(coords)
+    else:
+        df['zona_geografica'] = 0  # Valor por defecto
+    
+    # Calcular distancia al centro
+    centro_lat, centro_lon = -33.4489, -70.6693
+    df['distancia_centro'] = np.sqrt(
+        (df['latitud_corregida'] - centro_lat)**2 + 
+        (df['longitud_corregida'] - centro_lon)**2
+    ) * 111
+    
+    # Mapear densidad por zona
+    if densidad_por_zona is not None:
+        df['densidad_zona'] = df['zona_geografica'].map(densidad_por_zona)
+    else:
+        df['densidad_zona'] = 0.1  # Valor por defecto
+    
+    # Codificar variables categóricas
+    categorical_cols = ['desc_tipo_bien', 'regularizado', 'antiguedad_bin', 'sup_edificada_bin']
+    
+    for col in categorical_cols:
+        if col in df.columns and col in label_encoders:
+            try:
+                df[f'{col}_encoded'] = label_encoders[col].transform(df[col].astype(str))
+            except:
+                # Si el valor no existe en el encoder, usar 0
+                df[f'{col}_encoded'] = 0
+    
+    X = df[available_features].fillna(0)
+    
+    return X
+
+def predecir_valor_propiedad_v2(datos_propiedad, modelo, scaler, label_encoders, available_features, kmeans_model, densidad_por_zona):
+    """Realiza la predicción usando el modelo v2"""
+    try:
+        X_prepared = preparar_datos_entrada_v2(datos_propiedad, label_encoders, available_features, kmeans_model, densidad_por_zona)
+        X_scaled = scaler.transform(X_prepared)
+        valor_predicho = modelo.predict(X_scaled)[0]
+        return valor_predicho
+    except Exception as e:
+        app.logger.error(f"Error en la predicción v2: {e}")
+        return None
+
+
+
+
+modelo_v2, scaler_v2, label_encoders_v2, available_features_v2, kmeans_model_v2, densidad_por_zona_v2 = cargar_modelo_v2()
+
+@app.route('/predict_encargo', methods=['POST'])
+def predict_encargo_endpoint():
+ 
+    try:
+        data = request.get_json(force=True)
+        
+        # Validar campos requeridos
+        campos_requeridos = [
+            'latitud', 'longitud', 'ano_construccion',
+            'sup_edificada', 'sup_terreno', 'desc_tipo_bien', 'regularizado'
+        ]
+        
+        for campo in campos_requeridos:
+            if campo not in data:
+                return jsonify({'error': f"Campo requerido faltante: {campo}"}), 400
+        
+        # Validar tipos de datos
+        try:
+            datos_propiedad = {
+                'latitud': float(data['latitud']),
+                'longitud': float(data['longitud']),
+                'ano_construccion': int(data['ano_construccion']),
+                'sup_edificada': float(data['sup_edificada']),
+                'sup_terreno': float(data['sup_terreno']),
+                'desc_tipo_bien': str(data['desc_tipo_bien']),
+                'regularizado': str(data['regularizado'])
+            }
+        except (ValueError, TypeError) as e:
+            return jsonify({'error': f"Error en tipos de datos: {str(e)}"}), 400
+        
+        # Validar valores específicos
+        if datos_propiedad['desc_tipo_bien'] not in ['Casa', 'Departamento', 'Oficina']:
+            return jsonify({'error': "desc_tipo_bien debe ser 'Casa', 'Departamento' u 'Oficina'"}), 400
+        
+        # Normalizar y validar regularizado
+        regularizado_input = datos_propiedad['regularizado'].lower().strip()
+        valores_si = ['sí', 'si', 's', 'yes', 'y', 'true', '1']
+        valores_no = ['no', 'n', 'false', '0']
+        
+        if regularizado_input in valores_si:
+            datos_propiedad['regularizado'] = 'Sí'
+        elif regularizado_input in valores_no:
+            datos_propiedad['regularizado'] = 'No'
+        else:
+            return jsonify({'error': "regularizado debe ser 'Sí', 'Si', 'No' o variaciones similares"}), 400
+        
+        if datos_propiedad['sup_terreno'] <= 0:
+            return jsonify({'error': "sup_terreno debe ser mayor a 0"}), 400
+        
+        if datos_propiedad['sup_edificada'] <= 0:
+            return jsonify({'error': "sup_edificada debe ser mayor a 0"}), 400
+        
+        # Verificar que el modelo esté cargado
+        if modelo_v2 is None:
+            return jsonify({'error': "Modelo v2 no disponible"}), 500
+        
+        # Realizar predicción
+        valor_predicho = predecir_valor_propiedad_v2(
+            datos_propiedad, modelo_v2, scaler_v2, label_encoders_v2, 
+            available_features_v2, kmeans_model_v2, densidad_por_zona_v2
+        )
+        
+        if valor_predicho is None:
+            return jsonify({'error': "No se pudo realizar la predicción"}), 500
+        
+        # Calcular datos adicionales para la respuesta
+        antiguedad = datetime.now().year - datos_propiedad['ano_construccion']
+        densidad_construccion = datos_propiedad['sup_edificada'] / datos_propiedad['sup_terreno']
+        
+        # Respuesta JSON
+        return jsonify({
+            'prediction_uf': float(valor_predicho),
+            'datos_procesados': {
+                'antiguedad': antiguedad,
+                'densidad_construccion': float(densidad_construccion),
+                'tipo_bien': datos_propiedad['desc_tipo_bien'],
+                'regularizado': datos_propiedad['regularizado'],
+                'superficie_edificada_m2': datos_propiedad['sup_edificada'],
+                'superficie_terreno_m2': datos_propiedad['sup_terreno'],
+                'latitud': datos_propiedad['latitud'],
+                'longitud': datos_propiedad['longitud']
+            }
+        }), 200
+        
+    except Exception as e:
+        app.logger.error(f"Error en predict_encargo_endpoint: {e}")
+        return jsonify({'error': str(e)}), 400
+
+
+@app.route('/encargo_metrics', methods=['GET'])
+def encargo_metrics_endpoint():
+    try:
+        # Cargar métricas desde archivo JSON
+        with open('encargos_data/metricas_encargo.json', 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return jsonify(data), 200
+    except FileNotFoundError:
+        return jsonify({'error': 'metricas_encargo.json no encontrado en encargos_data/'}), 404
+    except json.JSONDecodeError as e:
+        return jsonify({'error': f'Error al parsear JSON: {str(e)}'}), 500
+    except Exception as e:
+        app.logger.error(f"Error en encargo_metrics_endpoint: {e}")
+        return jsonify({'error': str(e)}), 500
+
 
 
 

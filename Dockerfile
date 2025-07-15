@@ -20,6 +20,10 @@ COPY data_preprocessed/ ./data_preprocessed/
 COPY metrics.json ./
 COPY Makefile ./
 
+# Archivos del modelo v2 para encargos
+COPY encargos_data/ ./encargos_data/
+COPY encargos_model.py features_valuacion_propiedades_v2.pkl label_encoders_valuacion_propiedades_v2.pkl ./
+COPY modelo_valuacion_propiedades_v2.pkl scaler_valuacion_propiedades_v2.pkl ./
 
 
 RUN chown -R apiuser:apiuser /app

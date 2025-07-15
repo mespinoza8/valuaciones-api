@@ -1,0 +1,21 @@
+{
+  "tipo_modelo": "XGBRegressor",
+  "r2_score": "0.8215",
+  "rmse": "937.58 UF",
+  "mae": "634.19 UF",
+  "overfitting_gap": "0.0203",
+  "data_leakage": "Eliminado",
+  "fecha_entrenamiento": "2025-07-14T21:36:54.041215",
+  "version_modelo": "V2",
+  "metricas_detalladas": {
+    "train_r2": 0.8418200663711564,
+    "test_r2": 0.8215061481828402,
+    "train_rmse": 882.0050260169237,
+    "test_rmse": 937.5802454225643,
+    "train_mae": 601.8815921751167,
+    "test_mae": 634.1874445107844,
+    "r2_gap": 0.020313918188316182,
+    "rmse_gap": 55.57521940564061,
+    "mae_gap": 32.30585233566774
+  }
+}
