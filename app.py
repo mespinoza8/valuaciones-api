@@ -63,7 +63,7 @@ COMUNA_REGION_MAP = {
 # --- Configuración de la Base de Datos MariaDB ---
 db_user = os.getenv('DB_USER')
 db_pass = os.getenv('DB_PASSWORD')
-db_host = os.getenv('HOST')
+db_host = os.getenv('DB_HOST')
 db_port = os.getenv('DB_PORT', '3306')
 db_name = os.getenv('DB_NAME', 'ml_valoranet')
 # Añadimos charset utf8mb4 para compatibilidad de caracteres

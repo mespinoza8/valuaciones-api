@@ -26,7 +26,7 @@ from model import entrenar_y_guardar_modelo
 DB_URI = (
     f"mysql+pymysql://"
     f"{os.getenv('DB_USER')}:{os.getenv('DB_PASSWORD')}@"
-    f"{os.getenv('HOST')}:{os.getenv('PORT','3306')}/"
+    f"{os.getenv('DB_HOST')}:{os.getenv('PORT','3306')}/"
     f"{os.getenv('DATABASE','ml_valoranet')}"
 )
 SHP_PATHS = {
