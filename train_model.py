@@ -57,7 +57,7 @@ query = text("""
         superficie_util,
         dormitorios,
         banos,
-        estacionamientos,
+        case when estacionamientos>0 then TRUE else FALSE end as estacionamientos,
         antiguedad,
         orientacion,
         latitud,
@@ -91,6 +91,7 @@ df = preprocesar_nulos(df)
 df = rellenar_estacionamientos(df)
 df = rellenar_dormitorios(df)
 df['antiguedad'] = df['antiguedad'].apply(lambda x: 2025 - x if x >= 1000 else x)
+df['estacionamientos'] = df['estacionamientos'].apply(lambda x: True if x>0 else False)
 
 # 3.4 Calcular distancias geoespaciales
 gp = geometry_points(df)
@@ -128,8 +129,9 @@ df_metrics = df[mask].copy()
 df_metrics.to_parquet('data_preprocessed/df_metrics.parquet')
 
 df=df.drop(columns=['geometry','source','comuna','URL','disponible','fecha_creacion',
-                    'fecha_modificacion','orientacion','id','name','desc','ubicacion','estacionamientos','index_right','antiguedad'],axis=1)
+                    'fecha_modificacion','orientacion','id','name','desc','ubicacion','index_right','divisa'],axis=1)
 
+#estacionamientos
 
 df_model = df[mask].copy()
 

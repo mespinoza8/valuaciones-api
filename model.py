@@ -59,6 +59,7 @@ def entrenar_y_guardar_modelo(df: pd.DataFrame,
     X_full = pd.concat([X_train, X_test])
     y_full = pd.concat([y_train, y_test])
 
+
     results = evaluar_modelo_cv(X_full, y_full, preproc)
     best = min(results, key=lambda m: results[m]['rmse'])
 
@@ -89,6 +90,28 @@ def entrenar_y_guardar_modelo(df: pd.DataFrame,
     with open(metrics_path, "w", encoding="utf-8") as mf:
         json.dump(metrics_output, mf, indent=4, ensure_ascii=False)
     print(f"Métricas guardadas en: {metrics_path}")
+
+## Importancia de variables
+    feature_names = []
+    try:
+        num_cols = X_full.select_dtypes(include=['int64','float64']).columns.tolist()
+        cat_cols = X_full.select_dtypes(include=['object','category']).columns.tolist()
+        ohe = preproc.named_transformers_['cat'].named_steps['onehot']
+        cat_features = ohe.get_feature_names_out(cat_cols)
+        feature_names = list(num_cols) + list(cat_features)
+    except Exception as e:
+        feature_names = [f"var_{i}" for i in range(final_pipe.named_steps['model'].feature_importances_.shape[0])]
+
+    # Obtener importancias
+    importances = final_pipe.named_steps['model'].feature_importances_
+    importancia_dict = dict(sorted(zip(feature_names, importances), key=lambda x: x[1], reverse=True))
+
+    # Guardar en JSON
+    importancia_path = os.path.join(os.path.dirname(model_path), "importancia_variables.json")
+    with open(importancia_path, "w", encoding="utf-8") as f:
+        json.dump(importancia_dict, f, indent=4, ensure_ascii=False)
+    print(f"Importancia de variables guardada en: {importancia_path}")
+
 
 
     return results, best

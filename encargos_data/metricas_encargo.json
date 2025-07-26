@@ -1,21 +1,21 @@
 {
   "tipo_modelo": "XGBRegressor",
-  "r2_score": "0.8215",
-  "rmse": "937.58 UF",
-  "mae": "634.19 UF",
+  "r2_score": "0.8226",
+  "rmse": "934.75 UF",
+  "mae": "633.11 UF",
   "overfitting_gap": "0.0203",
   "data_leakage": "Eliminado",
-  "fecha_entrenamiento": "2025-07-14T22:31:34.538326",
+  "fecha_entrenamiento": "2025-07-26T09:58:22.449908",
   "version_modelo": "V2",
   "metricas_detalladas": {
-    "train_r2": 0.8418200663711564,
-    "test_r2": 0.8215061481828402,
-    "train_rmse": 882.0050260169237,
-    "test_rmse": 937.5802454225643,
-    "train_mae": 601.8815921751167,
-    "test_mae": 634.1874445107844,
-    "r2_gap": 0.020313918188316182,
-    "rmse_gap": 55.57521940564061,
-    "mae_gap": 32.30585233566774
+    "train_r2": 0.8429158494470333,
+    "test_r2": 0.82258235092527,
+    "train_rmse": 878.9446952865571,
+    "test_rmse": 934.7494701097061,
+    "train_mae": 599.1955610298663,
+    "test_mae": 633.1141046191445,
+    "r2_gap": 0.02033349852176336,
+    "rmse_gap": 55.80477482314893,
+    "mae_gap": 33.918543589278215
   }
 }

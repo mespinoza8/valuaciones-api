@@ -1,0 +1,62 @@
+[
+  {
+    "feature": "sup_edificada",
+    "importance": 0.27439266443252563
+  },
+  {
+    "feature": "desc_tipo_bien_encoded",
+    "importance": 0.19599980115890503
+  },
+  {
+    "feature": "sup_terreno",
+    "importance": 0.17424340546131134
+  },
+  {
+    "feature": "sup_edificada_bin_encoded",
+    "importance": 0.09055274724960327
+  },
+  {
+    "feature": "longitud_corregida",
+    "importance": 0.06186159700155258
+  },
+  {
+    "feature": "latitud_corregida",
+    "importance": 0.05434020608663559
+  },
+  {
+    "feature": "antiguedad",
+    "importance": 0.03805045038461685
+  },
+  {
+    "feature": "distancia_centro",
+    "importance": 0.03183688968420029
+  },
+  {
+    "feature": "ano_construccion",
+    "importance": 0.024326181039214134
+  },
+  {
+    "feature": "regularizado_encoded",
+    "importance": 0.02179696224629879
+  },
+  {
+    "feature": "antiguedad_bin_encoded",
+    "importance": 0.011215532198548317
+  },
+  {
+    "feature": "nombre_entidad_encoded",
+    "importance": 0.009411131031811237
+  },
+  {
+    "feature": "zona_geografica",
+    "importance": 0.007957465946674347
+  },
+  {
+    "feature": "densidad_zona",
+    "importance": 0.004015006124973297
+  },
+  {
+    "feature": "densidad_construccion",
+    "importance": 0.0
+  }
+]

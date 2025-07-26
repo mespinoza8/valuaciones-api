@@ -165,27 +165,27 @@ def predict_endpoint():
             'n_properties':        int(nro_propiedades),
             'requested_at':        datetime.now()
         }
-        insert_sql = text("""
-            INSERT INTO model_predictions (
-                divisa, tipo, superficie_util, superficie_total,
-                antiguedad, dormitorios, banos,
-                comuna, region, latitud, longitud,
-                distancia_ed_superior_km, distancia_ed_escolar_km,
-                distancia_comisaria_km, distancia_est_salud_km,
-                distancia_metro_km, prediction_uf,
-                avg_price_uf, avg_price_uf_m2, n_properties, requested_at
-            ) VALUES (
-                :divisa, :tipo, :superficie_util, :superficie_total,
-                :antiguedad, :dormitorios, :banos,
-                :Comuna, :Region, :latitud, :longitud,
-                :distancia_ed_superior_km, :distancia_ed_escolar_km,
-                :distancia_comisaria_km, :distancia_est_salud_km,
-                :distancia_metro_km, :prediction_uf,
-                :avg_price_uf, :avg_price_uf_m2, :n_properties, :requested_at
-            )
-        """)
-        with engine.begin() as conn:
-            conn.execute(insert_sql, record)
+        # insert_sql = text("""
+        #     INSERT INTO model_predictions (
+        #         divisa, tipo, superficie_util, superficie_total,
+        #         antiguedad, dormitorios, banos,
+        #         comuna, region, latitud, longitud,
+        #         distancia_ed_superior_km, distancia_ed_escolar_km,
+        #         distancia_comisaria_km, distancia_est_salud_km,
+        #         distancia_metro_km, prediction_uf,
+        #         avg_price_uf, avg_price_uf_m2, n_properties, requested_at
+        #     ) VALUES (
+        #         :divisa, :tipo, :superficie_util, :superficie_total,
+        #         :antiguedad, :dormitorios, :banos,
+        #         :Comuna, :Region, :latitud, :longitud,
+        #         :distancia_ed_superior_km, :distancia_ed_escolar_km,
+        #         :distancia_comisaria_km, :distancia_est_salud_km,
+        #         :distancia_metro_km, :prediction_uf,
+        #         :avg_price_uf, :avg_price_uf_m2, :n_properties, :requested_at
+        #     )
+        # """)
+        # with engine.begin() as conn:
+        #     conn.execute(insert_sql, record)
 
         # 9) Respuesta JSON
         return jsonify({
@@ -322,7 +322,7 @@ def preparar_datos_entrada_v2(datos_entrada, label_encoders, available_features,
         df['densidad_zona'] = 0.1  # Valor por defecto
     
     # Codificar variables categóricas
-    categorical_cols = ['desc_tipo_bien', 'regularizado', 'antiguedad_bin', 'sup_edificada_bin']
+    categorical_cols = ['desc_tipo_bien', 'regularizado', 'antiguedad_bin', 'sup_edificada_bin','nombre_entidad']
     
     for col in categorical_cols:
         if col in df.columns and col in label_encoders:
@@ -377,7 +377,8 @@ def predict_encargo_endpoint():
                 'sup_edificada': float(data['sup_edificada']),
                 'sup_terreno': float(data['sup_terreno']),
                 'desc_tipo_bien': str(data['desc_tipo_bien']),
-                'regularizado': str(data['regularizado'])
+                'regularizado': str(data['regularizado']),
+                'nombre_entidad': str(data['nombre_entidad'])
             }
         except (ValueError, TypeError) as e:
             return jsonify({'error': f"Error en tipos de datos: {str(e)}"}), 400
@@ -432,7 +433,8 @@ def predict_encargo_endpoint():
                 'superficie_edificada_m2': datos_propiedad['sup_edificada'],
                 'superficie_terreno_m2': datos_propiedad['sup_terreno'],
                 'latitud': datos_propiedad['latitud'],
-                'longitud': datos_propiedad['longitud']
+                'longitud': datos_propiedad['longitud'],
+                'nombre_entidad': datos_propiedad['nombre_entidad']
             }
         }), 200
         

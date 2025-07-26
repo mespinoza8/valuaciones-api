@@ -88,7 +88,7 @@ FROM ml_valoranet.encargo a
 
     df_modelo=df_modelo[['desc_tipo_bien','latitud','longitud','ano_construccion','material','regularizado',
 'sup_edificada','sup_terreno','antiguedad_construccion',
-'destino_sii','uso_actual','valor_comercial_encargo_supervisado_uf']]
+'destino_sii','uso_actual','valor_comercial_encargo_supervisado_uf','nombre_entidad']]
     
     df_modelo['valor_corregido']=df_modelo['valor_comercial_encargo_supervisado_uf'].str.replace('.', '', regex=False)\
     .str.replace(',', '.', regex=False).astype(float)
@@ -124,7 +124,7 @@ FROM ml_valoranet.encargo a
 
     df_modelo=df_modelo.query("sup_edificada.notna()")
     cols=['desc_tipo_bien','latitud_corregida','longitud_corregida','ano_construccion','regularizado',
-'sup_edificada','sup_terreno','valor_corregido']
+'sup_edificada','sup_terreno','valor_corregido','nombre_entidad']
 
     df_modelo=df_modelo[cols]
 
@@ -195,7 +195,7 @@ def realizar_eda(df):
     excluded_vars = ['uf_m2_edificada', 'uf_m2_terreno']
     for var in excluded_vars:
         if var in df.columns:
-            print(f"\n⚠️  Variable {var} encontrada - será excluida del modelo")
+            print(f" Variable {var} encontrada - será excluida del modelo")
             correlation = df[var].corr(df['valor_corregido'])
             print(f"   Correlación con valor_corregido: {correlation:.4f}")
     
@@ -233,7 +233,7 @@ def feature_engineering(df):
     
     # Guardar el modelo KMeans para uso futuro
     joblib.dump(kmeans, 'encargos_data/kmeans_zona_geografica_v2.pkl')
-    print("✅ Modelo KMeans guardado como 'encargos_data/kmeans_zona_geografica_v2.pkl'")
+    print("Modelo KMeans guardado como 'encargos_data/kmeans_zona_geografica_v2.pkl'")
     
     # 6. Distancia al centro
     centro_lat, centro_lon = -33.4489, -70.6693
@@ -248,10 +248,10 @@ def feature_engineering(df):
     
     # Guardar el mapeo de densidad por zona para uso futuro
     joblib.dump(densidad_por_zona, 'encargos_data/densidad_por_zona_v2.pkl')
-    print("✅ Mapeo de densidad por zona guardado como 'encargos_data/densidad_por_zona_v2.pkl'")
+    print("Mapeo de densidad por zona guardado como 'encargos_data/densidad_por_zona_v2.pkl'")
     
     # 8. Codificación de variables categóricas
-    categorical_cols = ['desc_tipo_bien', 'regularizado', 'antiguedad_bin', 'sup_edificada_bin']
+    categorical_cols = ['desc_tipo_bien', 'regularizado', 'antiguedad_bin', 'sup_edificada_bin','nombre_entidad']
     label_encoders = {}
     
     for col in categorical_cols:
@@ -274,7 +274,7 @@ def preparar_datos(df_fe):
         'densidad_construccion', 'antiguedad',
         'zona_geografica', 'distancia_centro', 'densidad_zona',
         'desc_tipo_bien_encoded', 'regularizado_encoded', 
-        'antiguedad_bin_encoded', 'sup_edificada_bin_encoded'
+        'antiguedad_bin_encoded', 'sup_edificada_bin_encoded','nombre_entidad_encoded'
     ]
     
     # Verificar que no estén las variables excluidas
@@ -282,7 +282,7 @@ def preparar_datos(df_fe):
     for var in excluded_vars:
         if var in feature_cols:
             feature_cols.remove(var)
-            print(f"⚠️  Variable {var} removida de features")
+            print(f"  Variable {var} removida de features")
     
     available_features = [col for col in feature_cols if col in df_fe.columns]
     print(f"Features disponibles: {len(available_features)}")
@@ -356,11 +356,11 @@ def analizar_overfitting(model, X_train, y_train, X_test, y_test, model_name):
     
     # Evaluación de overfitting
     if r2_gap > 0.1:
-        print("⚠️  ADVERTENCIA: Posible overfitting detectado (R² gap > 0.1)")
+        print("  ADVERTENCIA: Posible overfitting detectado (R² gap > 0.1)")
     elif r2_gap > 0.05:
-        print("⚠️  ADVERTENCIA: Ligero overfitting detectado (R² gap > 0.05)")
+        print(" ADVERTENCIA: Ligero overfitting detectado (R² gap > 0.05)")
     else:
-        print("✅ Modelo bien generalizado")
+        print("Modelo bien generalizado")
     
     # Learning curves
     train_sizes, train_scores, test_scores = learning_curve(
@@ -418,7 +418,7 @@ def analizar_data_leakage(df_fe, available_features):
     
     # 5. Verificar variables categóricas
     print("\n5. Verificación de variables categóricas:")
-    categorical_features = ['desc_tipo_bien', 'regularizado', 'antiguedad_bin', 'sup_edificada_bin']
+    categorical_features = ['desc_tipo_bien', 'regularizado', 'antiguedad_bin', 'sup_edificada_bin','nombre_entidad']
     for feature in categorical_features:
         if feature in available_features:
             # Calcular correlación usando la versión codificada
@@ -432,9 +432,9 @@ def analizar_data_leakage(df_fe, available_features):
     excluded_vars = ['uf_m2_edificada', 'uf_m2_terreno', 'valor_corregido']
     for var in excluded_vars:
         if var in available_features:
-            print(f"   ⚠️  ADVERTENCIA: {var} está en las features (debería estar excluida)")
+            print(f"     ADVERTENCIA: {var} está en las features (debería estar excluida)")
         else:
-            print(f"   ✅ {var} correctamente excluida")
+            print(f"    {var} correctamente excluida")
     
     return correlations
 
@@ -586,6 +586,15 @@ def analizar_importancia_features(best_model, available_features):
     
     return None
 
+def guardar_importancia_variables_json(feature_importance, filename="encargos_data/importancia_variables_encargo.json"):
+    """Guardar la importancia de variables en un archivo JSON"""
+    import json
+    # Convertir a lista de diccionarios
+    importancia_list = feature_importance.to_dict(orient="records")
+    with open(filename, "w", encoding="utf-8") as f:
+        json.dump(importancia_list, f, indent=2, ensure_ascii=False)
+    print(f"Importancia de variables guardada en {filename}")
+
 def analizar_errores(y_test, y_pred):
     """Analizar errores del modelo"""
     print("\n=== ANÁLISIS DE ERRORES ===")
@@ -668,11 +677,11 @@ def generar_reporte_final(optimized_analysis, feature_importance, correlations):
     print(f"MAE gap: {optimized_analysis['mae_gap']:.4f}")
     
     if optimized_analysis['r2_gap'] > 0.1:
-        print("⚠️  ADVERTENCIA: Posible overfitting detectado")
+        print(" ADVERTENCIA: Posible overfitting detectado")
     elif optimized_analysis['r2_gap'] > 0.05:
-        print("⚠️  ADVERTENCIA: Ligero overfitting detectado")
+        print(" ADVERTENCIA: Ligero overfitting detectado")
     else:
-        print("✅ Modelo bien generalizado")
+        print(" Modelo bien generalizado")
     
     if feature_importance is not None:
         print("\nTop 5 features más importantes:")
@@ -731,6 +740,10 @@ def main():
     
     # 12. Generar reporte final
     generar_reporte_final(optimized_analysis, feature_importance, data_leakage_correlations)
+
+    # Guardar importancia de variables en JSON
+    if feature_importance is not None:
+        guardar_importancia_variables_json(feature_importance)
 
 if __name__ == "__main__":
     main() 
