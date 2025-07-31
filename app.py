@@ -332,6 +332,14 @@ def preparar_datos_entrada_v2(datos_entrada, label_encoders, available_features,
                 # Si el valor no existe en el encoder, usar 0
                 df[f'{col}_encoded'] = 0
     
+    # Asegurar que todas las características requeridas estén presentes
+    for feature in available_features:
+        if feature not in df.columns:
+            if feature == 'antiguedad':
+                df[feature] = datetime.now().year - df['ano_construccion']
+            else:
+                df[feature] = 0
+    
     X = df[available_features].fillna(0)
     
     return X
@@ -378,7 +386,6 @@ def predict_encargo_endpoint():
                 'sup_terreno': float(data['sup_terreno']),
                 'desc_tipo_bien': str(data['desc_tipo_bien']),
                 'regularizado': str(data['regularizado']),
-                'nombre_entidad': str(data['nombre_entidad'])
             }
         except (ValueError, TypeError) as e:
             return jsonify({'error': f"Error en tipos de datos: {str(e)}"}), 400
