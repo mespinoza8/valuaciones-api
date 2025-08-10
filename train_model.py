@@ -43,7 +43,9 @@ query = text("""
         id,
         name,
         URL,
-        divisa,
+        case when divisa='CLP' then '$'
+        when divisa='CLF' then 'UF' 
+        when divisa='US$' then 'US$'else divisa end as divisa,
         precio,
         `desc`,
         ubicacion,
@@ -63,6 +65,12 @@ query = text("""
         latitud,
         longitud
     FROM witness_scrapper
+    where divisa in ('UF',
+'$',
+'CLP',
+'CLF',
+'US$'
+    )
 """)
 
 # --- 2) Cargar datos brutos desde MySQL ---
@@ -80,7 +88,7 @@ df=pd.concat([df, resultados_api], ignore_index=True)
 # --- 3) Preprocessing idéntico al de tu API ---
 # 3.1 Convertir precios a UF (asegura que 'precio' sea float para evitar warnings)
 df['precio'] = df['precio'].astype(float)
-df = convertir_precio(df, valor_uf=39300)
+df = convertir_precio(df, valor_uf=39200)
 
 # 3.2 Limpiar columnas numéricas
 for col in ['superficie_util', 'superficie_total', 'antiguedad', 'banos', 'dormitorios']:
@@ -129,7 +137,7 @@ df_metrics = df[mask].copy()
 df_metrics.to_parquet('data_preprocessed/df_metrics.parquet')
 
 df=df.drop(columns=['geometry','source','comuna','URL','disponible','fecha_creacion',
-                    'fecha_modificacion','orientacion','id','name','desc','ubicacion','index_right','divisa'],axis=1)
+                    'fecha_modificacion','orientacion','id','name','desc','ubicacion','index_right','divisa','antiguedad'],axis=1)
 
 #estacionamientos
 
