@@ -5,7 +5,7 @@
   "mae": "633.11 UF",
   "overfitting_gap": "0.0203",
   "data_leakage": "Eliminado",
-  "fecha_entrenamiento": "2025-07-26T09:58:22.449908",
+  "fecha_entrenamiento": "2025-09-08T16:40:53.351483",
   "version_modelo": "V2",
   "metricas_detalladas": {
     "train_r2": 0.8429158494470333,

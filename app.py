@@ -369,7 +369,7 @@ def predict_encargo_endpoint():
         # Validar campos requeridos
         campos_requeridos = [
             'latitud', 'longitud', 'ano_construccion',
-            'sup_edificada', 'sup_terreno', 'desc_tipo_bien', 'regularizado'
+            'sup_edificada', 'sup_terreno', 'desc_tipo_bien', 'regularizado', 'nombre_entidad'
         ]
         
         for campo in campos_requeridos:
@@ -386,6 +386,7 @@ def predict_encargo_endpoint():
                 'sup_terreno': float(data['sup_terreno']),
                 'desc_tipo_bien': str(data['desc_tipo_bien']),
                 'regularizado': str(data['regularizado']),
+                'nombre_entidad': str(data['nombre_entidad']),
             }
         except (ValueError, TypeError) as e:
             return jsonify({'error': f"Error en tipos de datos: {str(e)}"}), 400
