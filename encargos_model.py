@@ -625,7 +625,7 @@ def guardar_modelo(best_model, scaler, label_encoders, available_features, optim
     # Guardar modelo KMeans si está disponible
     if kmeans_model is not None:
         joblib.dump(kmeans_model, 'encargos_data/kmeans_zona_geografica_v2.pkl')
-        print("✅ Modelo KMeans guardado en encargos_data/")
+        print(" Modelo KMeans guardado en encargos_data/")
     
     # Guardar métricas en archivo JSON
     from datetime import datetime

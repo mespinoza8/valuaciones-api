@@ -204,29 +204,21 @@ def predict_endpoint():
 
 @app.route('/retrain', methods=['POST'])
 def retrain_endpoint():
-
-    # Autenticación
-    auth = request.headers.get('Authorization', '')
-    if not auth.startswith('Bearer '):
-        return jsonify(error='Missing or invalid Authorization header'), 401
-    token = auth.split(' ', 1)[1]
-    try:
-        jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
-    except jwt.InvalidTokenError:
-        return jsonify(error='Invalid token'), 401
-
+    # Token simple como query param o header
+    token = request.args.get('token') or request.headers.get('X-API-Token')
+    if token != SECRET_KEY:
+        return jsonify({'error': 'Invalid token'}), 401
+    
     # Lanzar entrenamiento (nota: esto bloqueará la petición)
     proc = subprocess.run(['python3', 'train_model.py'], capture_output=True, text=True)
     if proc.returncode != 0:
-        return jsonify(status='error', message=proc.stderr), 500
-
+        return jsonify({'error': proc.stderr}), 500
+    
     # Recargar modelo
     global model
     model = joblib.load(MODEL_PATH)
-
-    # Devolver token nuevo opcionalmente
-    new_token = jwt.encode({'retrained_at': datetime.now().isoformat()}, SECRET_KEY, algorithm='HS256')
-    return jsonify(status='success', message='Model retrained', token=new_token), 200
+    
+    return jsonify({'status': 'success', 'message': 'Model retrained'}), 200
 
 @app.route('/metrics', methods=['GET'])
 def metrics_endpoint():
