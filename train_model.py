@@ -93,7 +93,7 @@ df=pd.concat([df, resultados_api], ignore_index=True)
 # --- 3) Preprocessing idéntico al de tu API ---
 # 3.1 Convertir precios a UF (asegura que 'precio' sea float para evitar warnings)
 df['precio'] = df['precio'].astype(float)
-df = convertir_precio(df, valor_uf=39200)
+df = convertir_precio(df, valor_uf=39300)
 
 # 3.2 Limpiar columnas numéricas
 for col in ['superficie_util', 'superficie_total', 'antiguedad', 'banos', 'dormitorios']:
@@ -155,76 +155,71 @@ X_train, X_test, y_train, y_test, preproc = preparar_datos_para_modelo(df_model)
 X_full = pd.concat([X_train, X_test])
 y_full = pd.concat([y_train, y_test])
 
-# 4.2 Definir rejillas de hiperparámetros por modelo
+# 4.2 Hiperparámetros optimizados para Random Forest
 param_grids = {
-    'LightGBM': {
-        'model__n_estimators': [200, 500],
-        'model__learning_rate': [0.05, 0.1],
-        'model__num_leaves': [31, 63],
-        'model__max_depth': [-1, 10],
-        'model__subsample': [0.8, 1.0],
-        'model__colsample_bytree': [0.8, 1.0],
-    },
-    'CatBoost': {
-        'model__n_estimators': [300, 600],
-        'model__depth': [6, 8],
-        'model__learning_rate': [0.05, 0.1],
-        'model__l2_leaf_reg': [1, 3, 5],
-    },
     'Random Forest': {
-        'model__n_estimators': [300, 600],
-        'model__max_depth': [None, 20, 40],
-        'model__min_samples_split': [2, 5],
-        'model__min_samples_leaf': [1, 2],
-        'model__max_features': ['sqrt', 'log2', None],
+        'model__n_estimators': [300, 500],
+        'model__max_depth': [25, 30],
+        'model__min_samples_split': [2, 3],
+        'model__min_samples_leaf': [1],
+        'model__max_features': ['sqrt', 0.8]
     }
 }
 
-kf = KFold(n_splits=5, shuffle=True, random_state=42)
+kf = KFold(n_splits=2, shuffle=True, random_state=42)
 
 resultados = {}
 mejores_est = {}
 
 from sklearn.pipeline import Pipeline
 
-for nombre_modelo, estimador in models.items():
-    pipe = Pipeline([
-        ('preprocessor', preproc),
-        ('model', estimador)
-    ])
+# Solo entrenar Random Forest con grid search optimizado
+nombre_modelo = 'Random Forest'
+estimador = models[nombre_modelo]
 
+pipe = Pipeline([
+    ('preprocessor', preproc),
+    ('model', estimador)
+])
+
+# Grid search para Random Forest
+if nombre_modelo in param_grids:
+    print(f"Optimizando hiperparámetros para {nombre_modelo}...")
     grid = GridSearchCV(
         estimator=pipe,
-        param_grid=param_grids.get(nombre_modelo, {}),
+        param_grid=param_grids[nombre_modelo],
         scoring='neg_root_mean_squared_error',
         cv=kf,
-        n_jobs=-1,
-        verbose=0,
+        n_jobs=1,
+        verbose=1,
         refit=True,
         return_train_score=False
     )
-
     grid.fit(X_full, y_full)
     best_estimator = grid.best_estimator_
-    mejores_est[nombre_modelo] = best_estimator
+    print(f"Mejores parámetros: {grid.best_params_}")
+else:
+    pipe.fit(X_full, y_full)
+    best_estimator = pipe
 
-    # Métricas consistentes con el modelo anterior (CV sobre todo el dataset)
-    y_pred = cross_val_predict(best_estimator, X_full, y_full, cv=kf, n_jobs=-1)
-    mse = mean_squared_error(y_full, y_pred)
-    rmse = float(np.sqrt(mse))
-    r2 = float(r2_score(y_full, y_pred))
-    mape = float(np.mean(np.abs((y_full - y_pred) / y_full)) * 100)
+mejores_est[nombre_modelo] = best_estimator
 
-    resultados[nombre_modelo] = {
-        'rmse': rmse,
-        'r2': r2,
-        'mape': mape
-    }
+# Métricas consistentes con el modelo anterior (CV sobre todo el dataset)
+y_pred = cross_val_predict(best_estimator, X_full, y_full, cv=kf, n_jobs=1)
+mse = mean_squared_error(y_full, y_pred)
+rmse = float(np.sqrt(mse))
+r2 = float(r2_score(y_full, y_pred))
+mape = float(np.mean(np.abs((y_full - y_pred) / y_full)) * 100)
 
-# 4.3 Seleccionar el mejor modelo por RMSE y entrenar final
-mejor_modelo = min(resultados, key=lambda m: resultados[m]['rmse'])
-modelo_final = mejores_est[mejor_modelo]
-modelo_final.fit(X_full, y_full)
+resultados[nombre_modelo] = {
+    'rmse': rmse,
+    'r2': r2,
+    'mape': mape
+}
+
+# 4.3 Usar Random Forest como modelo final
+mejor_modelo = nombre_modelo
+modelo_final = best_estimator
 
 # 4.4 Guardar artefactos: modelo, métricas e importancias
 project_dir = os.path.dirname(os.path.abspath(__file__))
