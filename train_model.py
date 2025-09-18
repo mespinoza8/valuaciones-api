@@ -224,7 +224,7 @@ modelo_final = best_estimator
 # 4.4 Guardar artefactos: modelo, métricas e importancias
 project_dir = os.path.dirname(os.path.abspath(__file__))
 model_path = os.path.join(project_dir, 'modelo_valoracion.pkl')
-joblib.dump(modelo_final, model_path)
+joblib.dump(modelo_final, model_path, compress=3)
 
 metrics_output = {
     'model_name': mejor_modelo,
