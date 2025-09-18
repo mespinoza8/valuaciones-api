@@ -39,7 +39,7 @@ def normalize_str(s: str) -> str:
 # Configuración
 
 SECRET_KEY = os.getenv('SECRET_KEY')
-MODEL_PATH = os.getenv('MODEL_PATH', 'modelo_valoracion.pkl')
+MODEL_PATH = os.getenv('MODEL_PATH', 'modelo_valoracion.joblib')
 SHP_PATHS = {
     'ed_superior': os.getenv('ED_SUPERIOR_SHP', 'data_preprocessed/ed_superior.parquet').strip("'\""),
     'ed_escolar':  os.getenv('ED_ESCOLAR_SHP',  'data_preprocessed/ed_escolar.parquet').strip("'\""),

@@ -22,5 +22,6 @@ model_version/
 metrics.json
 
 *.pkl
+*.joblib
 
 *.ipynb

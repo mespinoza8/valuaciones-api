@@ -9,11 +9,26 @@ from dotenv import load_dotenv
 import requests
 from sklearn.model_selection import GridSearchCV, KFold, cross_val_predict
 from sklearn.metrics import mean_squared_error, r2_score
+import logging
+from datetime import datetime
 
 
+
+# Configurar logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('training.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
 # Carga variables de entorno desde .env
 load_dotenv()
+logger.info("=== INICIO DEL ENTRENAMIENTO ===")
+logger.info(f"Fecha y hora: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 from utils import (
     convertir_precio,
@@ -79,27 +94,35 @@ query = text("""
 """)
 
 # --- 2) Cargar datos brutos desde MySQL ---
+logger.info("Conectando a la base de datos MySQL...")
 engine = create_engine(DB_URI)
 with engine.connect() as conn:
     df = pd.read_sql(sql=query, con=conn)
+logger.info(f"Datos cargados desde MySQL: {len(df)} registros")
 
 # --- 2.1) Cargar datos validados desde la API
+logger.info("Cargando datos validados desde resultados_qa.xlsx...")
 resultados_api=pd.read_excel('resultados_qa.xlsx')
 resultados_api = resultados_api.fillna('')
 
 df=pd.concat([df, resultados_api], ignore_index=True)
+logger.info(f"Total de datos tras combinar: {len(df)} registros")
 
 
 # --- 3) Preprocessing idéntico al de tu API ---
+logger.info("=== INICIANDO PREPROCESSING ===")
 # 3.1 Convertir precios a UF (asegura que 'precio' sea float para evitar warnings)
+logger.info("Convirtiendo precios a UF...")
 df['precio'] = df['precio'].astype(float)
 df = convertir_precio(df, valor_uf=39300)
 
 # 3.2 Limpiar columnas numéricas
+logger.info("Limpiando columnas numéricas...")
 for col in ['superficie_util', 'superficie_total', 'antiguedad', 'banos', 'dormitorios']:
     df[col] = df[col].apply(limpieza)
 
 # 3.3 Normalizar nulos y rellenar a partir de 'desc'
+logger.info("Procesando valores nulos y rellenando datos...")
 df = preprocesar_nulos(df)
 df = rellenar_estacionamientos(df)
 df = rellenar_dormitorios(df)
@@ -107,7 +130,9 @@ df['antiguedad'] = df['antiguedad'].apply(lambda x: 2025 - x if x >= 1000 else x
 df['estacionamientos'] = df['estacionamientos'].apply(lambda x: True if x>0 else False)
 
 # 3.4 Calcular distancias geoespaciales
+logger.info("Calculando distancias geoespaciales...")
 gp = geometry_points(df)
+logger.info("Cargando shapefiles...")
 ed_sup = gpd.read_parquet(SHP_PATHS['ed_superior'])
 ed_esc = gpd.read_parquet(SHP_PATHS['ed_escolar'])
 comi   = gpd.read_parquet(SHP_PATHS['comisarias'])
@@ -116,17 +141,17 @@ metro  = gpd.read_parquet(SHP_PATHS['metro'])
 
 comunas_gdf = gpd.read_parquet(SHP_PATHS['comunas'])
 
-
+logger.info("Realizando spatial join con comunas...")
 comunas_gdf = comunas_gdf.to_crs(gp.crs)
-
 df = gpd.sjoin(gp, comunas_gdf[['geometry', 'Comuna','Region']], how="left")
 
-
+logger.info("Calculando distancias a servicios...")
 df['distancia_ed_superior_km'] = calculate_nearest_distances(gp, ed_sup)
 df['distancia_ed_escolar_km']  = calculate_nearest_distances(gp, ed_esc)
 df['distancia_comisaria_km']   = calculate_nearest_distances(gp, comi)
 df['distancia_est_salud_km']   = calculate_nearest_distances(gp, salud)
 df['distancia_metro_km']       = calculate_nearest_distances_metro(gp, metro)
+logger.info("Distancias geoespaciales calculadas correctamente")
 
 # 3.5 Filtrar outliers (misma máscara que en tu script original)
 mask = (
@@ -149,20 +174,25 @@ df=df.drop(columns=['geometry','source','comuna','URL','disponible','fecha_creac
 df_model = df[mask].copy()
 
 # --- 4) Ajuste de hiperparámetros con GridSearchCV y guardado ---
+logger.info("=== INICIANDO ENTRENAMIENTO DEL MODELO ===")
 
 # 4.1 Preparar matrices y preprocesador reutilizando la lógica de model.py
+logger.info("Preparando datos para el modelo...")
 X_train, X_test, y_train, y_test, preproc = preparar_datos_para_modelo(df_model)
 X_full = pd.concat([X_train, X_test])
 y_full = pd.concat([y_train, y_test])
+logger.info(f"Datos preparados: {len(X_full)} muestras, {X_full.shape[1]} características")
 
-# 4.2 Hiperparámetros optimizados para Random Forest
+# 4.2 Hiperparámetros balanceados para mínimo error con tamaño controlado
 param_grids = {
     'Random Forest': {
-        'model__n_estimators': [300, 500],
-        'model__max_depth': [25, 30],
-        'model__min_samples_split': [2, 3],
-        'model__min_samples_leaf': [1],
-        'model__max_features': ['sqrt', 0.8]
+        'model__n_estimators': [300],     # Balance entre accuracy y tamaño
+        'model__max_depth': [25],          # Suficiente profundidad para capturar patrones
+        'model__min_samples_split': [2, 5],    # Permite splits más granulares
+        'model__min_samples_leaf': [1, 2],     # Hojas más pequeñas para mejor fit
+        'model__max_features': [ 0.6],  # Balance entre features y generalización
+        'model__bootstrap': [True],            # Mantener bootstrap para regularización
+        'model__max_samples': [ 0.9]       # Subsample para reducir overfitting y tamaño
     }
 }
 
@@ -184,32 +214,52 @@ pipe = Pipeline([
 
 # Grid search para Random Forest
 if nombre_modelo in param_grids:
-    print(f"Optimizando hiperparámetros para {nombre_modelo}...")
+    logger.info(f"Optimizando hiperparámetros para {nombre_modelo}...")
+    param_combinations = 1
+    for param_values in param_grids[nombre_modelo].values():
+        param_combinations *= len(param_values)
+    total_fits = param_combinations * kf.n_splits
+    logger.info(f"Evaluando {param_combinations} combinaciones con {kf.n_splits}-fold CV = {total_fits} entrenamientos totales")
+
     grid = GridSearchCV(
         estimator=pipe,
         param_grid=param_grids[nombre_modelo],
         scoring='neg_root_mean_squared_error',
         cv=kf,
-        n_jobs=1,
-        verbose=1,
+        n_jobs=-1,
+        verbose=2,  # Aumentado para más detalle
         refit=True,
         return_train_score=False
     )
+
+    logger.info("Iniciando Grid Search...")
+    start_time = datetime.now()
     grid.fit(X_full, y_full)
+    end_time = datetime.now()
+
     best_estimator = grid.best_estimator_
-    print(f"Mejores parámetros: {grid.best_params_}")
+    logger.info(f"Grid Search completado en {end_time - start_time}")
+    logger.info(f"Mejores parámetros: {grid.best_params_}")
+    logger.info(f"Mejor score CV: {-grid.best_score_:.2f}")
 else:
+    logger.info("Entrenando con parámetros por defecto...")
     pipe.fit(X_full, y_full)
     best_estimator = pipe
 
 mejores_est[nombre_modelo] = best_estimator
 
 # Métricas consistentes con el modelo anterior (CV sobre todo el dataset)
+logger.info("Calculando métricas finales con cross-validation...")
 y_pred = cross_val_predict(best_estimator, X_full, y_full, cv=kf, n_jobs=1)
 mse = mean_squared_error(y_full, y_pred)
 rmse = float(np.sqrt(mse))
 r2 = float(r2_score(y_full, y_pred))
 mape = float(np.mean(np.abs((y_full - y_pred) / y_full)) * 100)
+
+logger.info(f"Métricas del modelo:")
+logger.info(f"  - RMSE: {rmse:.2f}")
+logger.info(f"  - R²: {r2:.4f}")
+logger.info(f"  - MAPE: {mape:.2f}%")
 
 resultados[nombre_modelo] = {
     'rmse': rmse,
@@ -222,9 +272,15 @@ mejor_modelo = nombre_modelo
 modelo_final = best_estimator
 
 # 4.4 Guardar artefactos: modelo, métricas e importancias
+logger.info("=== GUARDANDO MODELO Y ARTEFACTOS ===")
 project_dir = os.path.dirname(os.path.abspath(__file__))
-model_path = os.path.join(project_dir, 'modelo_valoracion.pkl')
+model_path = os.path.join(project_dir, 'modelo_valoracion.joblib')
+
+logger.info("Guardando modelo comprimido...")
+start_save = datetime.now()
 joblib.dump(modelo_final, model_path, compress=3)
+end_save = datetime.now()
+logger.info(f"Modelo guardado en {end_save - start_save}")
 
 metrics_output = {
     'model_name': mejor_modelo,
@@ -260,6 +316,12 @@ if importancias is not None:
     with open(importancia_path, 'w', encoding='utf-8') as f:
         json.dump(importancia_dict, f, indent=4, ensure_ascii=False)
 
-print("Resultados CV de cada modelo:", resultados)
-print("Mejor modelo seleccionado:", mejor_modelo)
-print("Archivo 'modelo_valoracion.pkl' creado correctamente.")
+# Verificar tamaño del archivo
+model_size = os.path.getsize(model_path) / (1024**3)  # GB
+logger.info(f"Tamaño del modelo: {model_size:.2f} GB")
+
+logger.info("=== ENTRENAMIENTO COMPLETADO ===")
+logger.info(f"Resultados CV: {resultados}")
+logger.info(f"Mejor modelo seleccionado: {mejor_modelo}")
+logger.info("Archivo 'modelo_valoracion.joblib' creado correctamente.")
+logger.info("Logs guardados en 'training.log'")

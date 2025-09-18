@@ -74,7 +74,7 @@ def entrenar_y_guardar_modelo(df: pd.DataFrame,
     if model_path is None:
         # Directorio donde reside este script (model.py)
         project_dir = os.path.dirname(os.path.abspath(__file__))
-        model_path = os.path.join(project_dir, 'modelo_valoracion.pkl')
+        model_path = os.path.join(project_dir, 'modelo_valoracion.joblib')
 
     # 4) Serializar
     joblib.dump(final_pipe, model_path)

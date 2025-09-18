@@ -90,7 +90,7 @@ DB_PORT=3306
 DB_NAME=base_de_datos
 
 # Modelo y datos preprocesados (archivos Parquet)
-MODEL_PATH=modelo_valoracion.pkl
+MODEL_PATH=modelo_valoracion.joblib
 ED_SUPERIOR_SHP=data_preprocessed/ed_superior.parquet
 ED_ESCOLAR_SHP=data_preprocessed/ed_escolar.parquet
 COMISARIAS_SHP=data_preprocessed/comisarias.parquet
@@ -135,7 +135,7 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt && pip install pyarrow gunicorn
-COPY app.py model.py utils.py modelo_valoracion.pkl .env ./
+COPY app.py model.py utils.py modelo_valoracion.joblib .env ./
 COPY data_preprocessed/ ./data_preprocessed/
 # COPY vpn/ /vpn/  # si encapsulas VPN
 
