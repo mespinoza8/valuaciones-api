@@ -13,8 +13,9 @@ import subprocess
 import jwt
 import json
 import unicodedata
-import numpy as np 
+import numpy as np
 from data_metrics import metricas_comuna
+from shap_explainer import SHAPExplainer
 
 load_dotenv()
 
@@ -80,6 +81,14 @@ engine = create_engine(
 # Cargar el modelo serializado
 model = joblib.load(MODEL_PATH)
 
+# Inicializar explicador SHAP
+try:
+    shap_explainer = SHAPExplainer(MODEL_PATH)
+    print("✓ SHAP Explainer inicializado correctamente")
+except Exception as e:
+    print(f"⚠ Warning: No se pudo inicializar SHAP Explainer: {e}")
+    shap_explainer = None
+
 # Cargar shapefiles en memoria
 ed_sup = gpd.read_parquet(SHP_PATHS['ed_superior'])
 ed_esc = gpd.read_parquet(SHP_PATHS['ed_escolar'])
@@ -140,6 +149,19 @@ def predict_endpoint():
         df_new = pd.DataFrame([features])
         prediction = model.predict(df_new)[0]
 
+        # 6.5) Generar explicación SHAP
+        shap_explanation = None
+        if shap_explainer is not None:
+            try:
+                shap_result = shap_explainer.explain_prediction(df_new, top_n=5)
+                if shap_result and shap_result.get('available', False):
+                    shap_explanation = {
+                        'top_features': shap_result['top_features'],
+                        'explanation_text': shap_result['explanation_text']
+                    }
+            except Exception as e:
+                app.logger.warning(f"Error al calcular SHAP: {e}")
+
         # 7) Métricas por comuna
         metricas_comuna_df = metricas_comuna()
         metricas_comuna_df['comuna_norm'] = metricas_comuna_df['Comuna'].apply(normalize_str)
@@ -187,13 +209,40 @@ def predict_endpoint():
         # with engine.begin() as conn:
         #     conn.execute(insert_sql, record)
 
-        # 9) Respuesta JSON
+        # 9) Calcular confianza y rango (similar a la referencia)
+        prediction_uf = float(np.expm1(prediction)) if prediction < 20 else float(prediction)
+
+        # Calcular margen de error (simplificado, puedes ajustar la lógica)
+        margen_error_pct = 0.43  # 43% de ejemplo, ajustar según tu modelo
+        precio_min = prediction_uf * (1 - margen_error_pct)
+        precio_max = prediction_uf * (1 + margen_error_pct)
+
+        # Determinar nivel de confianza
+        if nro_propiedades > 100:
+            confianza = "Alta"
+        elif nro_propiedades > 50:
+            confianza = "Media"
+        else:
+            confianza = "Baja"
+
+        # 10) Respuesta JSON con formato solicitado
+        response_data = {
+            'tipo': data.get('tipo', 'desconocido'),
+            'comuna': comuna,
+            'precio_uf': int(round(prediction_uf)),
+            'rango': f"{int(round(precio_min))} - {int(round(precio_max))} UF",
+            'confianza': confianza,
+            'margen_error': f"±{int(margen_error_pct * 100)}.0%",
+            'region': region
+        }
+
+        # Agregar explicación SHAP si está disponible
+        if shap_explanation:
+            response_data['shap_explanation'] = shap_explanation
+
         return jsonify({
-            'prediction_uf':                    float(prediction),
-            'comuna':                           comuna,
-            'valor_promedio_propiedades_comuna': float(avg_price_uf),
-            'superficie_util_promedio_comuna':   float(superficie_util_prom),
-            'cantidad_propiedades_comuna':       int(nro_propiedades)
+            'success': True,
+            'data': response_data
         }), 200
 
     except Exception as e:
